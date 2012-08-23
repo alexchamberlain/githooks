@@ -8,24 +8,6 @@ from time import time
 from math import floor
 from pprint import pprint
 
-def getrepo():
-  cmd = ['git', 'rev-parse', '--git-dir']
-  child = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-  git_dir, junk = child.communicate()
-  git_dir = git_dir.strip()
-  print(git_dir)
-
-def git_clone(repo, dir, branch=None):
-  cmd = ['git', 'clone']
-  if branch != None:
-    cmd += ['-b', branch]
-
-  cmd += [repo, dir]
-
-  rc = subprocess.call(cmd)
-  if rc != 0:
-    print('Failed ' + ' '.join(cmd))
-
 def git_push(repo, remote, branch):
   cmd = ['git', '--git-dir={}/.git'.format(repo), 'push', remote, branch]
 
