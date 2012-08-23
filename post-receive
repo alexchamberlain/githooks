@@ -1,0 +1,13 @@
+#!/bin/bash
+SOURCE="${BASH_SOURCE[0]}"
+DIR="$( dirname "$SOURCE" )"
+
+echo "DIR=$DIR"
+
+for SCRIPT in $DIR/post-receive.d/*
+do
+  if [ -f "$SCRIPT" -a -x "$SCRIPT" ] 
+  then
+    "$SCRIPT"
+  fi
+done
