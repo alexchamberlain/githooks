@@ -10,7 +10,7 @@ from math import floor
 from pprint import pprint
 
 def git_clone(repo, dir, branch=None):
-  cmd = ['git', 'clone']
+  cmd = ['git', 'clone', '-q']
   if branch != None:
     cmd += ['-b', branch]
 
@@ -44,12 +44,12 @@ def jekyll(source, target):
   if rc != 0:
     print('Failed ' + ' '.join(cmd))
 
+def ensure_exists(path):
+  if not os.path.lexists(path):
+    os.makedirs(path)
+
 def empty_dir(path):
-  names = []
-  try:
-    names = os.listdir(path)
-  except os.error as e:
-    return 1
+  names = os.listdir(path)
 
   for name in names:
     fullname = os.path.join(path, name)
@@ -62,25 +62,20 @@ def empty_dir(path):
       empty_dir(fullname)
       os.rmdir(fullname)
     else:
-      try:
-        os.remove(fullname)
-      except os.error as err:
-        return 1
-
-  return 0
+      os.remove(fullname)
 
 def main():
   repo = os.path.realpath('.')
+  junk, website = os.path.split(repo)
   for line in sys.stdin:
-    print(line)
     m = re.search(r'^([0-9a-f]{40}) ([0-9a-f]{40}) refs/heads/([0-9a-zA-Z]+)$', line)
     if m:
-      print("Processing {}".format(m.group(3)))
       branch = m.group(3)
       build_branch = 'build-{}'.format(branch)
       tmp_git = tempfile.TemporaryDirectory()
       tmp_git_master = '{}/{}'.format(tmp_git.name, branch)
       tmp_git_build  = '{}/build-{}'.format(tmp_git.name, branch)
+      web_dir        = '/var/www/{}/{}'.format(website, branch)
 
       os.mkdir(tmp_git_master)
       os.mkdir(tmp_git_build)
@@ -92,16 +87,16 @@ def main():
       build_repo  = pygit2.Repository(tmp_git_build)
 
       head =  build_repo.lookup_reference('HEAD')
+      parents = [head.resolve().oid]
       
       try:
         ref = build_repo.lookup_reference('refs/remotes/origin/{}'.format(build_branch))
-        parents = [ref.oid]
+        parents += [ref.oid]
       except KeyError as e:
-        parents = []
+        # parents += []
+        pass
 
       head.target = 'refs/heads/{}'.format(build_branch)
-      pprint(parents)
-      
       
       jekyll(tmp_git_master, tmp_git_build)
 
@@ -122,10 +117,12 @@ def main():
       build_repo.create_commit('refs/heads/{}'.format(build_branch), author, committer, "Build", tree.oid, parents)
 
       git_push(tmp_git_build, 'origin', build_branch)
-      if 0 == empty_dir('/var/www/test'):
-        git_export(tmp_git_build, build_branch, '/var/www/test')
-    else:
-      print("Ignoring {}".format(line))
+      try:
+        ensure_exists(web_dir)
+        empty_dir(web_dir)
+        git_export(tmp_git_build, build_branch, web_dir)
+      except OSError:
+        pass
 
 if __name__=='__main__':
   main()
