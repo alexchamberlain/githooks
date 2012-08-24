@@ -2,6 +2,7 @@
 import sys,re
 import subprocess
 import os
+import stat
 import tempfile
 import pygit2
 from time import time
@@ -26,11 +27,47 @@ def git_push(repo, remote, branch):
   if rc != 0:
     print('Failed ' + ' '.join(cmd))
 
+def git_export(repo, branch, www):
+  git = ['git', '--git-dir={}/.git'.format(repo), 'archive', branch]
+  tar = ['tar', '-x', '-C', www]
+
+  g = subprocess.Popen(git, stdout=subprocess.PIPE)
+  t = subprocess.Popen(tar, stdin=g.stdout)
+  g.stdout.close()
+  rc = g.wait() + t.wait()
+  if rc != 0:
+    print('Failed ' + ' '.join(git) + ' | ' + ' '.join(tar))
+
 def jekyll(source, target):
   cmd = ['jekyll', '--no-auto', source, '{}/_site'.format(target)]
   rc = subprocess.call(cmd)
   if rc != 0:
     print('Failed ' + ' '.join(cmd))
+
+def empty_dir(path):
+  names = []
+  try:
+    names = os.listdir(path)
+  except os.error as e:
+    return 1
+
+  for name in names:
+    fullname = os.path.join(path, name)
+    try:
+      mode = os.lstat(fullname).st_mode
+    except os.error as e:
+      mode = 0
+
+    if stat.S_ISDIR(mode):
+      empty_dir(fullname)
+      os.rmdir(fullname)
+    else:
+      try:
+        os.remove(fullname)
+      except os.error as err:
+        return 1
+
+  return 0
 
 def main():
   repo = os.path.realpath('.')
@@ -42,7 +79,6 @@ def main():
       branch = m.group(3)
       build_branch = 'build-{}'.format(branch)
       tmp_git = tempfile.TemporaryDirectory()
-      #tmp_git = '/tmp/tmp-work'
       tmp_git_master = '{}/{}'.format(tmp_git.name, branch)
       tmp_git_build  = '{}/build-{}'.format(tmp_git.name, branch)
 
@@ -69,18 +105,12 @@ def main():
       
       jekyll(tmp_git_master, tmp_git_build)
 
-      #tb = build_repo.TreeBuilder()
       build_index = build_repo.index
 
       for dirpath, dirnames, filenames in os.walk(tmp_git_build):
         m = re.search(r'\.git', dirpath)
         if m:
           continue
-        #for dn in dirnames:
-        #  m = re.search(r'\.git', dn)
-        #  if m:
-        #    continue
-        #  build_index.add(os.path.join(dirpath, dn), 0)
         for fn in filenames:
           build_index.add(os.path.relpath(os.path.join(dirpath, fn), tmp_git_build), 0)
 
@@ -92,6 +122,8 @@ def main():
       build_repo.create_commit('refs/heads/{}'.format(build_branch), author, committer, "Build", tree.oid, parents)
 
       git_push(tmp_git_build, 'origin', build_branch)
+      if 0 == empty_dir('/var/www/test'):
+        git_export(tmp_git_build, build_branch, '/var/www/test')
     else:
       print("Ignoring {}".format(line))
 
