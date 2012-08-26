@@ -38,6 +38,10 @@ def git_export(repo, branch, www):
   if rc != 0:
     print('Failed ' + ' '.join(git) + ' | ' + ' '.join(tar))
 
+  for dirpath, dirnames, filenames in os.walk(tmp_git_build):
+    for fn in filenames:
+      os.chmod(os.path.join(dirpath, fn), stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+
 def jekyll(source, target):
   cmd = ['jekyll', '--no-auto', source, '{}/_site'.format(target)]
   rc = subprocess.call(cmd)
