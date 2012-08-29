@@ -8,6 +8,7 @@ import pygit2
 from time import time
 from math import floor
 from pprint import pprint
+import gzip
 
 def git_clone(repo, dir, branch=None):
   cmd = ['git', 'clone', '-q']
@@ -44,16 +45,15 @@ def git_export(repo, branch, www):
     for fn in filenames:
       os.chmod(os.path.join(dirpath, fn), stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
 
-def gzip(file):
-  cmd = ['gzip', '--keep', '--best', '--force', file]
-  rc = subprocess.call(cmd)
-  if rc != 0:
-    print('Failed to compress files.')
+def gzip_file(path):
+  with open(path, 'rb') as f_in:
+    with gzip.open('{}.gz'.format(path), 'wb') as f_out:
+      f_out.writelines(f_in)
 
 def gzip_recursive(path):
-  for dirpath. dirnames, filenames in os.walk(path):
+  for dirpath, dirnames, filenames in os.walk(path):
     for fn in filenames:
-      gzip(os.path.join(dirpath, fn))
+      gzip_file(os.path.join(dirpath, fn))
 
 def jekyll(source, target):
   cmd = ['jekyll', '--no-auto', source, '{}/_site'.format(target)]
@@ -116,6 +116,7 @@ def main():
       head.target = 'refs/heads/{}'.format(build_branch)
       
       jekyll(tmp_git_master, tmp_git_build)
+      gzip_recursive(tmp_git_build)
 
       build_index = build_repo.index
 
@@ -138,7 +139,6 @@ def main():
         ensure_exists(web_dir)
         empty_dir(web_dir)
         git_export(tmp_git_build, build_branch, web_dir)
-        gzip_recursive(web_dir)
       except OSError:
         pass
 
