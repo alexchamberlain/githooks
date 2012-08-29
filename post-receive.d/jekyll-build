@@ -39,8 +39,21 @@ def git_export(repo, branch, www):
     print('Failed ' + ' '.join(git) + ' | ' + ' '.join(tar))
 
   for dirpath, dirnames, filenames in os.walk(www):
+    for dn in dirnames:
+      os.chmod(os.path.join(dirpath, dn), stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
     for fn in filenames:
       os.chmod(os.path.join(dirpath, fn), stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+
+def gzip(file):
+  cmd = ['gzip', '--keep', '--best', '--force', file]
+  rc = subprocess.call(cmd)
+  if rc != 0:
+    print('Failed to compress files.')
+
+def gzip_recursive(path):
+  for dirpath. dirnames, filenames in os.walk(path):
+    for fn in filenames:
+      gzip(os.path.join(dirpath, fn))
 
 def jekyll(source, target):
   cmd = ['jekyll', '--no-auto', source, '{}/_site'.format(target)]
@@ -125,6 +138,7 @@ def main():
         ensure_exists(web_dir)
         empty_dir(web_dir)
         git_export(tmp_git_build, build_branch, web_dir)
+        gzip_recursive(web_dir)
       except OSError:
         pass
 
